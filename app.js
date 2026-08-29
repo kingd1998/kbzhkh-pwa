@@ -18,7 +18,7 @@ const ICONS = {
 const DEFAULT_SETTINGS = { fatMaxPercent: '', proteinMaxPercent: '', caPMaxRatio: '', caloriesMin: '', caloriesMax: '' };
 
 const state = {
-  screen: 'main', // main | addPicker | positions | edit | history | settings
+  screen: 'main', // main | addPicker | positions | edit | history | settings | feedback
   positions: [],
   draftItems: {},
   calcPositionIds: [],
@@ -29,7 +29,9 @@ const state = {
   editingId: null,
   confirm: null,
   addSearch: '',
-  positionsSearch: ''
+  positionsSearch: '',
+  feedbackText: '',
+  feedbackSending: false
 };
 
 function numOrNull(v) {
@@ -241,6 +243,29 @@ function clearDraft() {
   render();
 }
 
+async function sendFeedback() {
+  const text = state.feedbackText.trim();
+  if (!text) { showToast('Введите текст'); return; }
+  state.feedbackSending = true;
+  render();
+  try {
+    const res = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    if (!res.ok) throw new Error('bad status');
+    state.feedbackText = '';
+    showToast('Отправлено', 'light');
+    goTo('settings');
+  } catch (e) {
+    showToast('Не удалось отправить');
+  } finally {
+    state.feedbackSending = false;
+    render();
+  }
+}
+
 function loadSaved(id) {
   const s = state.savedCalcs.find((x) => x.id === id);
   if (!s) return;
@@ -295,6 +320,11 @@ function renderNav() {
       return `<div class="kbz-nav">
         <button class="kbz-iconbtn" data-action="goto" data-screen="main" aria-label="Назад">${ICONS.back()}</button>
         <span class="kbz-navtitle">Настройки</span>
+      </div>`;
+    case 'feedback':
+      return `<div class="kbz-nav">
+        <button class="kbz-iconbtn" data-action="goto" data-screen="settings" aria-label="Назад">${ICONS.back()}</button>
+        <span class="kbz-navtitle">Доработка</span>
       </div>`;
     default:
       return '';
@@ -495,6 +525,21 @@ function renderSettings() {
         </div>
       </div>
     </div>
+    <div class="kbz-section-title" style="margin-top:16px">Доработка</div>
+    <div class="kbz-section-hint">Опишите, что поправить или добавить — попадёт в задачи разработки.</div>
+    <button class="btn btn-secondary btn-block" data-action="goto" data-screen="feedback">Сообщить о доработке</button>
+  </div>`;
+}
+
+function renderFeedback() {
+  return `<div class="kbz-body">
+    <div class="field">
+      <label>Текст доработки</label>
+      <textarea class="input" rows="10" id="f-feedbackText" data-field="feedbackText" placeholder="Опишите, что нужно доработать или исправить…">${esc(state.feedbackText)}</textarea>
+    </div>
+  </div>
+  <div class="kbz-actionbar">
+    <button class="btn btn-primary btn-block" data-action="sendFeedback" ${state.feedbackSending ? 'disabled' : ''}>${state.feedbackSending ? 'Отправка…' : 'Отправить'}</button>
   </div>`;
 }
 
@@ -535,6 +580,7 @@ function render() {
     : state.screen === 'positions' ? renderPositions()
     : state.screen === 'edit' ? renderEdit()
     : state.screen === 'settings' ? renderSettings()
+    : state.screen === 'feedback' ? renderFeedback()
     : renderHistory();
   appEl.innerHTML = renderNav() + body + renderDialog();
 }
@@ -610,6 +656,7 @@ appEl.addEventListener('click', (e) => {
     case 'saveCalculation': saveCalculation(); break;
     case 'clearDraft': clearDraft(); break;
     case 'loadSaved': loadSaved(id); break;
+    case 'sendFeedback': sendFeedback(); break;
   }
 });
 
@@ -628,6 +675,7 @@ appEl.addEventListener('input', (e) => {
   }
   if (field === 'addSearch') state.addSearch = el.value;
   else if (field === 'positionsSearch') state.positionsSearch = el.value;
+  else if (field === 'feedbackText') state.feedbackText = el.value;
   else if (field.startsWith('qty.')) {
     const id = field.slice('qty.'.length);
     const digits = el.value.replace(/[^0-9]/g, '');
