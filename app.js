@@ -807,8 +807,14 @@ function migratePosition(p) {
 // добавление image в SEED_POSITIONS трогает только позиции, которых ещё нет в
 // IndexedDB. Подтягиваем фото задним числом, но только один раз (флаг в meta),
 // чтобы не переписывать фото, если пользователь потом сам его удалит.
+//
+// Флаг версионирован (V2, было 'seedImagesBackfilled'): 3 новых вида (аргентинский
+// таракан/саранча/бражник) приехали на устройства в v1.8.0 ещё без фото — старый
+// флаг к тому моменту уже был выставлен в true и заблокировал повторный бэкфилл,
+// когда фото для них появились в v1.9.0. V2 гарантирует, что бэкфилл прогонится
+// ещё раз для всех, у кого сейчас нет фото, но оно есть в SEED_POSITIONS.
 async function backfillSeedImages(positions) {
-  const done = await DB.getMeta('seedImagesBackfilled', false);
+  const done = await DB.getMeta('seedImagesBackfilledV2', false);
   if (done) return positions;
   const updated = positions.map((p) => {
     if (p.image) return p;
@@ -818,7 +824,7 @@ async function backfillSeedImages(positions) {
     DB.put('positions', next);
     return next;
   });
-  await DB.setMeta('seedImagesBackfilled', true);
+  await DB.setMeta('seedImagesBackfilledV2', true);
   return updated;
 }
 
