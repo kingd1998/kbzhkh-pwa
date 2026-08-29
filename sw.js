@@ -1,4 +1,4 @@
-const CACHE = 'kbzhkh-v8';
+const CACHE = 'kbzhkh-v9';
 const PRECACHE_URLS = [
   './',
   './index.html',

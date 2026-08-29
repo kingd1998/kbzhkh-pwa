@@ -12,8 +12,11 @@ const ICONS = {
   history: (s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>`,
   save: (s = 11) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`,
   clear: (s = 11) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>`,
-  gear: (s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
+  gear: (s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  photo: (s = 24) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="0"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`
 };
+
+const POSITION_IMAGE_SIZE = 200;
 
 const DEFAULT_SETTINGS = { fatMaxPercent: 15, proteinMinPercent: 30, caPMinRatio: 1, caloriesMin: 50, caloriesMax: '' };
 
@@ -94,7 +97,7 @@ function openAddPicker() { state.screen = 'addPicker'; state.addSearch = ''; ren
 
 function openPositionNew() {
   state.screen = 'edit'; state.editingId = null; state.editErrors = {};
-  state.editForm = { name: '', unitWeight: '', caloriesPerGram: '', proteinPercent: '', fatPercent: '', calciumPercent: '', phosphorusPercent: '', note: '' };
+  state.editForm = { name: '', unitWeight: '', caloriesPerGram: '', proteinPercent: '', fatPercent: '', calciumPercent: '', phosphorusPercent: '', note: '', image: null };
   render();
 }
 
@@ -105,8 +108,49 @@ function openPositionEdit(id) {
   state.editForm = {
     name: p.name, unitWeight: String(p.unitWeight), caloriesPerGram: String(p.caloriesPerGram),
     proteinPercent: String(p.proteinPercent), fatPercent: String(p.fatPercent),
-    calciumPercent: String(p.calciumPercent), phosphorusPercent: String(p.phosphorusPercent), note: p.note || ''
+    calciumPercent: String(p.calciumPercent), phosphorusPercent: String(p.phosphorusPercent), note: p.note || '',
+    image: p.image || null
   };
+  render();
+}
+
+// Даунскейлит и центрирует по кадру любую загруженную фотографию до
+// POSITION_IMAGE_SIZE — так в IndexedDB не оседают многомегабайтные исходники
+// с телефона, а все превью в списках получают одинаковый квадратный кроп.
+function resizeImageFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const size = POSITION_IMAGE_SIZE;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => reject(new Error('image decode failed'));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error('file read failed'));
+    reader.readAsDataURL(file);
+  });
+}
+
+async function pickPositionImage(file) {
+  try {
+    state.editForm.image = await resizeImageFile(file);
+    render();
+  } catch (e) {
+    showToast('Не удалось загрузить фото');
+  }
+}
+
+function clearPositionImage() {
+  state.editForm.image = null;
   render();
 }
 
@@ -136,7 +180,8 @@ function savePosition() {
     fatPercent: Number(f.fatPercent),
     calciumPercent: Number(f.calciumPercent),
     phosphorusPercent: Number(f.phosphorusPercent),
-    note: (f.note || '').trim()
+    note: (f.note || '').trim(),
+    image: f.image || null
   };
   if (state.editingId) state.positions = state.positions.map((p) => (p.id === record.id ? record : p));
   else state.positions = [...state.positions, record];
@@ -402,6 +447,10 @@ function renderMain() {
   </div>`;
 }
 
+function listThumb(p) {
+  return p.image ? `<img class="kbz-thumb" src="${p.image}" alt="">` : '';
+}
+
 function renderAddPicker() {
   const search = state.addSearch.trim().toLowerCase();
   const candidates = state.positions.filter((p) => !search || p.name.toLowerCase().includes(search));
@@ -409,6 +458,7 @@ function renderAddPicker() {
     const qty = state.draftItems[p.id] || 0;
     return `<div class="kbz-listrow" style="cursor:default">
       <div class="kbz-listrow-main">
+        ${listThumb(p)}
         <span class="kbz-listrow-title">${esc(p.name)}</span>
         <span class="kbz-listrow-sub">${p.unitWeight} г · ${p.caloriesPerGram} ккал/г</span>
       </div>
@@ -431,6 +481,7 @@ function renderPositions() {
   const filtered = state.positions.filter((p) => !search || p.name.toLowerCase().includes(search));
   const rows = filtered.map((p) => `<div class="kbz-listrow" data-action="editPosition" data-id="${p.id}">
     <div class="kbz-listrow-main">
+      ${listThumb(p)}
       <span class="kbz-listrow-title">${esc(p.name)}</span>
       <span class="kbz-listrow-sub">${p.unitWeight} г · ${p.caloriesPerGram} ккал/г</span>
     </div>
@@ -468,6 +519,19 @@ function renderEdit() {
   return `<div class="kbz-body">
     <div class="kbz-form">
       ${percentSum > 100 ? `<div class="kbz-warning">Сумма Белки+Жиры+Кальций+Фосфор превышает 100% — проверьте значения (в реальности это невозможно).</div>` : ''}
+      <div class="field">
+        <label>Фото</label>
+        <div class="kbz-photo-row">
+          ${f.image
+            ? `<img class="kbz-photo-preview" src="${f.image}" alt="" data-action="pickPositionImage">`
+            : `<div class="kbz-photo-placeholder" data-action="pickPositionImage">${ICONS.photo()}</div>`}
+          <div class="kbz-photo-actions">
+            <button type="button" class="btn btn-secondary" data-action="pickPositionImage">${f.image ? 'Заменить' : 'Загрузить'}</button>
+            ${f.image ? `<button type="button" class="btn btn-ghost" data-action="clearPositionImage">Удалить</button>` : ''}
+          </div>
+        </div>
+        <input type="file" accept="image/*" id="f-image-file" style="display:none">
+      </div>
       ${editField('Название', 'name', 'text')}
       ${editField('Вес 1 шт (г)', 'unitWeight', 'decimal')}
       ${editField('Калории — ккал на 1 г', 'caloriesPerGram', 'decimal')}
@@ -657,7 +721,15 @@ appEl.addEventListener('click', (e) => {
     case 'clearDraft': clearDraft(); break;
     case 'loadSaved': loadSaved(id); break;
     case 'sendFeedback': sendFeedback(); break;
+    case 'pickPositionImage': document.getElementById('f-image-file').click(); break;
+    case 'clearPositionImage': clearPositionImage(); break;
   }
+});
+
+appEl.addEventListener('change', (e) => {
+  const el = e.target;
+  if (el.id !== 'f-image-file' || !el.files || !el.files[0]) return;
+  pickPositionImage(el.files[0]);
 });
 
 appEl.addEventListener('input', (e) => {
