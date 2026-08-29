@@ -11,22 +11,31 @@ const ICONS = {
   list: (s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>`,
   history: (s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>`,
   save: (s = 11) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`,
-  clear: (s = 11) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>`
+  clear: (s = 11) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>`,
+  gear: (s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
 };
 
+const DEFAULT_SETTINGS = { fatMaxPercent: '', proteinMaxPercent: '', caPMaxRatio: '', caloriesMin: '', caloriesMax: '' };
+
 const state = {
-  screen: 'main', // main | addPicker | positions | edit | history
+  screen: 'main', // main | addPicker | positions | edit | history | settings
   positions: [],
   draftItems: {},
   calcPositionIds: [],
   savedCalcs: [],
+  settings: { ...DEFAULT_SETTINGS },
   editForm: null,
   editErrors: {},
   editingId: null,
   confirm: null,
   addSearch: '',
-  positionsSearch: ''
+  positionsSearch: '',
+  toast: null
 };
+
+function numOrNull(v) {
+  return v === '' || v === undefined || v === null ? null : Number(v);
+}
 
 function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -255,6 +264,7 @@ function renderNav() {
     case 'main':
       return `<div class="kbz-nav">
         <span class="kbz-navtitle">Расчёт</span>
+        <button class="kbz-iconbtn" data-action="goto" data-screen="settings" aria-label="Настройки">${ICONS.gear()}</button>
         <button class="kbz-iconbtn" data-action="goto" data-screen="positions" aria-label="Позиции">${ICONS.list()}</button>
         <button class="kbz-iconbtn" data-action="goto" data-screen="history" aria-label="История">${ICONS.history()}</button>
       </div>`;
@@ -280,13 +290,18 @@ function renderNav() {
         <button class="kbz-iconbtn" data-action="goto" data-screen="main" aria-label="Назад">${ICONS.back()}</button>
         <span class="kbz-navtitle">История</span>
       </div>`;
+    case 'settings':
+      return `<div class="kbz-nav">
+        <button class="kbz-iconbtn" data-action="goto" data-screen="main" aria-label="Назад">${ICONS.back()}</button>
+        <span class="kbz-navtitle">Настройки</span>
+      </div>`;
     default:
       return '';
   }
 }
 
-function summaryCell(label, value) {
-  return `<div class="kbz-summary-cell"><div class="kbz-summary-label">${label}</div><div class="kbz-summary-value">${value}</div></div>`;
+function summaryCell(label, value, warn) {
+  return `<div class="kbz-summary-cell"><div class="kbz-summary-label">${label}</div><div class="kbz-summary-value${warn ? ' kbz-alert' : ''}">${value}</div></div>`;
 }
 
 function fmtCaP(ratio) {
@@ -298,6 +313,18 @@ function renderMain() {
   const calcPositions = state.calcPositionIds
     .map((id) => state.positions.find((p) => p.id === id))
     .filter(Boolean);
+
+  const s = state.settings;
+  const fatLimit = numOrNull(s.fatMaxPercent);
+  const proteinLimit = numOrNull(s.proteinMaxPercent);
+  const caPLimit = numOrNull(s.caPMaxRatio);
+  const calMin = numOrNull(s.caloriesMin);
+  const calMax = numOrNull(s.caloriesMax);
+
+  const fatWarn = fatLimit !== null && totals.fatPercentOfMass > fatLimit;
+  const proteinWarn = proteinLimit !== null && totals.proteinPercentOfMass > proteinLimit;
+  const caPWarn = caPLimit !== null && totals.caPRatio !== null && totals.caPRatio > caPLimit;
+  const calWarn = (calMin !== null && totals.calories < calMin) || (calMax !== null && totals.calories > calMax);
 
   const rows = calcPositions.map((p) => {
     const qty = state.draftItems[p.id] || 0;
@@ -325,13 +352,13 @@ function renderMain() {
   return `<div class="kbz-body">
     <div class="card" style="padding:8px 10px">
       <div class="kbz-summary">
-        ${summaryCell('Калории', fmt(totals.calories) + ' ккал')}
+        ${summaryCell('Калории', fmt(totals.calories) + ' ккал', calWarn)}
         ${summaryCell('Белки', fmt(totals.protein) + ' г')}
         ${summaryCell('Жиры', fmt(totals.fat) + ' г')}
         ${summaryCell('Кальций', fmt(totals.calcium) + ' г')}
         ${summaryCell('Фосфор', fmt(totals.phosphorus) + ' г')}
       </div>
-      <div class="kbz-summary-extra">Ca:P ${fmtCaP(totals.caPRatio)} · Белки ${fmt(totals.proteinPercentOfMass)}% от массы · Жиры ${fmt(totals.fatPercentOfMass)}% от массы</div>
+      <div class="kbz-summary-extra">Ca:P <span class="${caPWarn ? 'kbz-alert' : ''}">${fmtCaP(totals.caPRatio)}</span> · Белки <span class="${proteinWarn ? 'kbz-alert' : ''}">${fmt(totals.proteinPercentOfMass)}%</span> от массы · Жиры <span class="${fatWarn ? 'kbz-alert' : ''}">${fmt(totals.fatPercentOfMass)}%</span> от массы</div>
     </div>
     ${state.positions.length === 0 ? `<div class="kbz-empty"><span>Справочник позиций пуст</span><button class="btn btn-primary" data-action="goto" data-screen="positions">Добавить позицию</button></div>` : ''}
     <button class="kbz-addcalc" data-action="openAddPicker">${ICONS.plus()} Добавить позицию в расчёт</button>
@@ -438,6 +465,32 @@ function renderHistory() {
   </div>`;
 }
 
+function settingsField(label, key, placeholder) {
+  return `<div class="field">
+    <label>${label}</label>
+    <input class="input" type="number" id="f-settings-${key}" data-field="settings.${key}" placeholder="${placeholder || ''}" value="${esc(state.settings[key])}">
+  </div>`;
+}
+
+function renderSettings() {
+  return `<div class="kbz-body">
+    <div class="kbz-section-title">Предупреждения</div>
+    <div class="kbz-section-hint">Если значение в расчёте выходит за рамки — оно подсвечивается красным на главном экране. Пустое поле — без ограничения.</div>
+    <div class="kbz-form">
+      ${settingsField('Жир выше, % от массы расчёта', 'fatMaxPercent')}
+      ${settingsField('Белок выше, % от массы расчёта', 'proteinMaxPercent')}
+      ${settingsField('Соотношение Ca:P выше', 'caPMaxRatio')}
+      <div class="field">
+        <label>Норма калорий, ккал</label>
+        <div class="kbz-range-row">
+          <input class="input" type="number" id="f-settings-caloriesMin" data-field="settings.caloriesMin" placeholder="От" value="${esc(state.settings.caloriesMin)}">
+          <input class="input" type="number" id="f-settings-caloriesMax" data-field="settings.caloriesMax" placeholder="До" value="${esc(state.settings.caloriesMax)}">
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderDialog() {
   if (!state.confirm) return '';
   const noun = state.confirm.type === 'position' ? 'Удалить позицию?' : 'Удалить расчёт?';
@@ -453,13 +506,25 @@ function renderDialog() {
   </div>`;
 }
 
+function renderToast() {
+  return state.toast ? `<div class="kbz-toast">${esc(state.toast)}</div>` : '';
+}
+
+let toastTimeout = null;
+function showToast(text) {
+  state.toast = text;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => { state.toast = null; render(); }, 1500);
+}
+
 function render() {
   const body = state.screen === 'main' ? renderMain()
     : state.screen === 'addPicker' ? renderAddPicker()
     : state.screen === 'positions' ? renderPositions()
     : state.screen === 'edit' ? renderEdit()
+    : state.screen === 'settings' ? renderSettings()
     : renderHistory();
-  appEl.innerHTML = renderNav() + body + renderDialog();
+  appEl.innerHTML = renderNav() + body + renderDialog() + renderToast();
 }
 
 function rerenderPreservingFocus() {
@@ -542,7 +607,11 @@ appEl.addEventListener('input', (e) => {
   const field = el.dataset.field;
   if (field === 'addSearch') state.addSearch = el.value;
   else if (field === 'positionsSearch') state.positionsSearch = el.value;
-  else state.editForm[field] = el.value;
+  else if (field.startsWith('settings.')) {
+    state.settings[field.slice('settings.'.length)] = el.value;
+    DB.setMeta('settings', state.settings);
+    showToast('Сохранено');
+  } else state.editForm[field] = el.value;
   rerenderPreservingFocus();
 });
 
@@ -562,6 +631,7 @@ async function init() {
   state.savedCalcs = await DB.getAll('savedCalcs');
   state.draftItems = await DB.getMeta('draftItems', {});
   state.calcPositionIds = await DB.getMeta('calcPositionIds', []);
+  state.settings = { ...DEFAULT_SETTINGS, ...(await DB.getMeta('settings', {})) };
 
   const seeded = await DB.getMeta('seeded', false);
   if (!seeded) {
