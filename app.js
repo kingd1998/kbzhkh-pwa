@@ -761,6 +761,15 @@ appEl.addEventListener('input', (e) => {
 
 const SEED_BY_ID = new Map(SEED_POSITIONS.map((p) => [p.id, p]));
 
+// Сид-позиции, существовавшие до того, как появился ensureSeedPositions ниже.
+// Нужны, чтобы на уже проинициализированных устройствах (старый булев флаг
+// 'seeded') новые виды из SEED_POSITIONS добавились, а эти восемь — нет, если
+// пользователь их удалил.
+const ORIGINAL_SEED_IDS = [
+  'p_cricket_domesticus', 'p_cricket_bimaculatus', 'p_cricket_banana',
+  'p_roach_marbled', 'p_roach_turkmen', 'p_bsf_larva', 'p_mealworm', 'p_zoophobas'
+];
+
 function migratePosition(p) {
   if (p.calciumPercent !== undefined) return p;
   const migrated = { ...p, calciumPercent: p.fiberPercent ?? 0, phosphorusPercent: p.chitinPercent ?? 0 };
@@ -789,6 +798,47 @@ async function backfillSeedImages(positions) {
   return updated;
 }
 
+// Добавляет в справочник виды из SEED_POSITIONS, которых устройство ещё не видело
+// — не только при самом первом запуске, но и когда в SEED_POSITIONS появляются
+// новые виды в последующих обновлениях. 'seededIds' — множество id, которые уже
+// были предложены устройству (независимо от того, оставил их пользователь или
+// удалил), чтобы удалённые вручную позиции не воскресали.
+async function ensureSeedPositions(positions) {
+  let seededIds = await DB.getMeta('seededIds', null);
+  if (seededIds === null) {
+    const wasSeeded = await DB.getMeta('seeded', false);
+    seededIds = wasSeeded ? [...ORIGINAL_SEED_IDS] : [];
+  }
+  const seededSet = new Set(seededIds);
+  const existingIds = new Set(positions.map((p) => p.id));
+  const toAdd = SEED_POSITIONS.filter((p) => !seededSet.has(p.id) && !existingIds.has(p.id));
+  for (const p of toAdd) await DB.put('positions', p);
+  SEED_POSITIONS.forEach((p) => { if (existingIds.has(p.id) || toAdd.includes(p)) seededSet.add(p.id); });
+  await DB.setMeta('seededIds', [...seededSet]);
+  await DB.setMeta('seeded', true);
+  return toAdd.length ? [...positions, ...toAdd] : positions;
+}
+
+// Разовое обновление данных для исходных 8 сид-позиций: вес/калорийность/Б/Ж/Ca/P
+// заменены на значения из таблицы поставщика (см. seed-data.js). Трогает только
+// эти шесть числовых полей у позиций с уже известными id — name/note/image и любые
+// пользовательские позиции не затрагиваются.
+async function refreshSeedNutrition(positions) {
+  const done = await DB.getMeta('seedNutritionRefreshedV2', false);
+  if (done) return positions;
+  const FIELDS = ['unitWeight', 'caloriesPerGram', 'proteinPercent', 'fatPercent', 'calciumPercent', 'phosphorusPercent'];
+  const updated = positions.map((p) => {
+    const seed = SEED_BY_ID.get(p.id);
+    if (!seed || !ORIGINAL_SEED_IDS.includes(p.id)) return p;
+    const next = { ...p };
+    FIELDS.forEach((f) => { next[f] = seed[f]; });
+    DB.put('positions', next);
+    return next;
+  });
+  await DB.setMeta('seedNutritionRefreshedV2', true);
+  return updated;
+}
+
 async function init() {
   state.positions = (await DB.getAll('positions')).map(migratePosition);
   state.savedCalcs = await DB.getAll('savedCalcs');
@@ -800,16 +850,9 @@ async function init() {
     if (storedSettings[key] !== undefined && storedSettings[key] !== '') state.settings[key] = storedSettings[key];
   }
 
-  const seeded = await DB.getMeta('seeded', false);
-  if (!seeded) {
-    const existingIds = new Set(state.positions.map((p) => p.id));
-    const toAdd = SEED_POSITIONS.filter((p) => !existingIds.has(p.id));
-    for (const p of toAdd) await DB.put('positions', p);
-    state.positions = [...state.positions, ...toAdd];
-    await DB.setMeta('seeded', true);
-  }
-
+  state.positions = await ensureSeedPositions(state.positions);
   state.positions = await backfillSeedImages(state.positions);
+  state.positions = await refreshSeedNutrition(state.positions);
 
   render();
 
