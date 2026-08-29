@@ -1,4 +1,4 @@
-const CACHE = 'kbzhkh-v1';
+const CACHE = 'kbzhkh-v2';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -6,6 +6,7 @@ const PRECACHE_URLS = [
   './app.js',
   './db.js',
   './seed-data.js',
+  './version.js',
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',

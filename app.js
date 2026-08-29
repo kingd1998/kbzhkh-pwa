@@ -326,6 +326,7 @@ function renderMain() {
     ${state.positions.length === 0 ? `<div class="kbz-empty"><span>Справочник позиций пуст</span><button class="btn btn-primary" data-action="goto" data-screen="positions">Добавить позицию</button></div>` : ''}
     <button class="kbz-addcalc" data-action="openAddPicker">${ICONS.plus()} Добавить позицию в расчёт</button>
     ${calcPositions.length === 0 ? `<div class="kbz-empty"><span>В расчёте пока нет позиций</span></div>` : `<div>${rows}</div>`}
+    <div class="kbz-version">${esc(APP_VERSION)}</div>
   </div>
   <div class="kbz-actionbar kbz-actionbar-compact">
     <button class="kbz-actbtn kbz-actbtn-primary" data-action="saveCalculation">${ICONS.save()} Сохранить</button>

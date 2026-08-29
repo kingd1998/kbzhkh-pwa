@@ -132,3 +132,4 @@ textarea.input { min-height: 70px; resize: vertical; }
 .kbz-warning{padding:10px 12px;border:2px solid var(--color-accent);background:var(--color-accent-100);font-size:13px;color:var(--color-accent-700)}
 .kbz-err{font-size:12px;color:var(--color-accent-700);margin-top:4px}
 .kbz-fielderr .input{border-color:var(--color-accent)}
+.kbz-version{text-align:center;padding:12px 0 4px;font-size:11px;color:var(--color-neutral-700)}
