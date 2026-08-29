@@ -138,3 +138,4 @@ textarea.input { min-height: 84px; resize: vertical; }
 .kbz-range-row{display:flex;gap:8px}
 .kbz-alert{color:#ff1e1e;font-weight:800}
 .kbz-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--color-text);color:var(--color-bg);padding:8px 16px;font-size:13px;font-weight:600;z-index:30;pointer-events:none}
+.kbz-toast-light{background:#fff;color:#000;border:2px solid #000;bottom:76px}

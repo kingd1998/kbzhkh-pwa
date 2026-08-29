@@ -231,12 +231,14 @@ function saveCalculation() {
   const record = { id: 's_' + Date.now(), createdAt: Date.now(), items, totals: draftTotals() };
   state.savedCalcs = [record, ...state.savedCalcs];
   DB.put('savedCalcs', record);
+  showToast('Сохранено', 'light');
   render();
 }
 
 function clearDraft() {
   state.draftItems = {};
   DB.setMeta('draftItems', {});
+  showToast('Очищено', 'light');
   render();
 }
 
@@ -507,12 +509,14 @@ function renderDialog() {
 }
 
 function renderToast() {
-  return state.toast ? `<div class="kbz-toast">${esc(state.toast)}</div>` : '';
+  if (!state.toast) return '';
+  const cls = state.toast.variant === 'light' ? 'kbz-toast kbz-toast-light' : 'kbz-toast';
+  return `<div class="${cls}">${esc(state.toast.text)}</div>`;
 }
 
 let toastTimeout = null;
-function showToast(text) {
-  state.toast = text;
+function showToast(text, variant = 'dark') {
+  state.toast = { text, variant };
   clearTimeout(toastTimeout);
   toastTimeout = setTimeout(() => { state.toast = null; render(); }, 1500);
 }
