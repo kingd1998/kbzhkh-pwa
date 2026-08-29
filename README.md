@@ -31,6 +31,9 @@ npx serve .
   справочник при первом запуске. `caloriesPerGram`, `calciumPercent` и
   `phosphorusPercent` у всех позиций — `0` (реальные значения не найдены в
   исходном источнике), дозаполнить вручную перед реальным использованием.
+  `image` — фото товара с t-rexfood.ru, вариант (живой/замороженный) утверждён
+  пользователем по каждой позиции, приведено к 200×200 JPEG data URI тем же
+  кодом, что и загрузка фото пользователем.
 - `manifest.webmanifest`, `sw.js`, `icons/` — PWA-артефакты.
 - `version.js` — номер релиза (`APP_VERSION`), см. «Версионирование» ниже.
 - `api/feedback.js` — Vercel serverless function, создаёт issue в GitHub по тексту
