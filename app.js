@@ -29,8 +29,7 @@ const state = {
   editingId: null,
   confirm: null,
   addSearch: '',
-  positionsSearch: '',
-  toast: null
+  positionsSearch: ''
 };
 
 function numOrNull(v) {
@@ -337,7 +336,7 @@ function renderMain() {
         <div class="kbz-stepper">
           <button class="kbz-stepbtn" data-action="removeFromCalc" data-id="${p.id}" aria-label="Убрать из расчёта">${ICONS.trash()}</button>
           <button class="kbz-stepbtn" data-hold="dec" data-scope="main" data-id="${p.id}" aria-label="Минус, удержать для быстрого счёта">${ICONS.minus()}</button>
-          <span class="kbz-stepqty">${qty}</span>
+          <input class="kbz-stepqty" id="f-qty-${p.id}" data-field="qty.${p.id}" type="text" inputmode="numeric" pattern="[0-9]*" value="${qty}" aria-label="Количество">
           <button class="kbz-stepbtn" data-hold="inc" data-scope="main" data-id="${p.id}" aria-label="Плюс, удержать для быстрого счёта">${ICONS.plus()}</button>
         </div>
       </div>
@@ -418,9 +417,15 @@ function renderPositions() {
 
 function editField(label, key, type) {
   const err = state.editErrors[key];
+  // type="number" inputs don't support setSelectionRange, so the focus/caret
+  // restore in rerenderPreservingFocus silently fails on them (the browser is
+  // then free to put the caret wherever it likes after refocus — sometimes
+  // the start, which reverses digit order as you type, e.g. "50" -> "05").
+  // text + inputmode keeps a numeric keypad on mobile without that failure.
+  const attrs = type === 'decimal' ? 'type="text" inputmode="decimal"' : `type="${type}"`;
   return `<div class="field ${err ? 'kbz-fielderr' : ''}">
     <label>${label}</label>
-    <input class="input" type="${type}" id="f-${key}" data-field="${key}" value="${esc(state.editForm[key])}">
+    <input class="input" ${attrs} id="f-${key}" data-field="${key}" value="${esc(state.editForm[key])}">
     ${err ? `<div class="kbz-err">${esc(err)}</div>` : ''}
   </div>`;
 }
@@ -434,12 +439,12 @@ function renderEdit() {
     <div class="kbz-form">
       ${percentSum > 100 ? `<div class="kbz-warning">Сумма Белки+Жиры+Кальций+Фосфор превышает 100% — проверьте значения (в реальности это невозможно).</div>` : ''}
       ${editField('Название', 'name', 'text')}
-      ${editField('Вес 1 шт (г)', 'unitWeight', 'number')}
-      ${editField('Калории — ккал на 1 г', 'caloriesPerGram', 'number')}
-      ${editField('Белки — % от веса', 'proteinPercent', 'number')}
-      ${editField('Жиры — % от веса', 'fatPercent', 'number')}
-      ${editField('Кальций — % от веса', 'calciumPercent', 'number')}
-      ${editField('Фосфор — % от веса', 'phosphorusPercent', 'number')}
+      ${editField('Вес 1 шт (г)', 'unitWeight', 'decimal')}
+      ${editField('Калории — ккал на 1 г', 'caloriesPerGram', 'decimal')}
+      ${editField('Белки — % от веса', 'proteinPercent', 'decimal')}
+      ${editField('Жиры — % от веса', 'fatPercent', 'decimal')}
+      ${editField('Кальций — % от веса', 'calciumPercent', 'decimal')}
+      ${editField('Фосфор — % от веса', 'phosphorusPercent', 'decimal')}
       <div class="field">
         <label>Заметка</label>
         <textarea class="input" rows="3" id="f-note" data-field="note" placeholder="Например, ключевые особенности вида">${esc(f.note)}</textarea>
@@ -508,17 +513,20 @@ function renderDialog() {
   </div>`;
 }
 
-function renderToast() {
-  if (!state.toast) return '';
-  const cls = state.toast.variant === 'light' ? 'kbz-toast kbz-toast-light' : 'kbz-toast';
-  return `<div class="${cls}">${esc(state.toast.text)}</div>`;
-}
+// Тост живёт вне appEl.innerHTML (собственный узел в document.body), чтобы
+// его показ/скрытие никогда не пересоздавал остальную разметку — иначе полю
+// с фокусом (например, в настройках) каждый раз сбрасывался бы курсор.
+const toastEl = document.createElement('div');
+toastEl.style.display = 'none';
+document.body.appendChild(toastEl);
 
 let toastTimeout = null;
 function showToast(text, variant = 'dark') {
-  state.toast = { text, variant };
+  toastEl.textContent = text;
+  toastEl.className = variant === 'light' ? 'kbz-toast kbz-toast-light' : 'kbz-toast';
+  toastEl.style.display = 'block';
   clearTimeout(toastTimeout);
-  toastTimeout = setTimeout(() => { state.toast = null; render(); }, 1500);
+  toastTimeout = setTimeout(() => { toastEl.style.display = 'none'; }, 1500);
 }
 
 function render() {
@@ -528,7 +536,7 @@ function render() {
     : state.screen === 'edit' ? renderEdit()
     : state.screen === 'settings' ? renderSettings()
     : renderHistory();
-  appEl.innerHTML = renderNav() + body + renderDialog() + renderToast();
+  appEl.innerHTML = renderNav() + body + renderDialog();
 }
 
 function rerenderPreservingFocus() {
@@ -609,12 +617,22 @@ appEl.addEventListener('input', (e) => {
   const el = e.target.closest('[data-field]');
   if (!el) return;
   const field = el.dataset.field;
-  if (field === 'addSearch') state.addSearch = el.value;
-  else if (field === 'positionsSearch') state.positionsSearch = el.value;
-  else if (field.startsWith('settings.')) {
+  if (field.startsWith('settings.')) {
+    // No re-render here: the settings screen has nothing else that depends on
+    // these values, and re-rendering would recreate the focused input,
+    // dropping the caret (that was the "50" -> "05" bug).
     state.settings[field.slice('settings.'.length)] = el.value;
     DB.setMeta('settings', state.settings);
     showToast('Сохранено');
+    return;
+  }
+  if (field === 'addSearch') state.addSearch = el.value;
+  else if (field === 'positionsSearch') state.positionsSearch = el.value;
+  else if (field.startsWith('qty.')) {
+    const id = field.slice('qty.'.length);
+    const digits = el.value.replace(/[^0-9]/g, '');
+    state.draftItems = { ...state.draftItems, [id]: digits === '' ? 0 : parseInt(digits, 10) };
+    DB.setMeta('draftItems', state.draftItems);
   } else state.editForm[field] = el.value;
   rerenderPreservingFocus();
 });
