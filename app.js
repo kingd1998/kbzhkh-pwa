@@ -15,7 +15,7 @@ const ICONS = {
   gear: (s = 20) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3 13.09H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`
 };
 
-const DEFAULT_SETTINGS = { fatMaxPercent: '', proteinMaxPercent: '', caPMaxRatio: '', caloriesMin: '', caloriesMax: '' };
+const DEFAULT_SETTINGS = { fatMaxPercent: '', proteinMinPercent: '', caPMaxRatio: '', caloriesMin: '', caloriesMax: '' };
 
 const state = {
   screen: 'main', // main | addPicker | positions | edit | history | settings | feedback
@@ -347,13 +347,13 @@ function renderMain() {
 
   const s = state.settings;
   const fatLimit = numOrNull(s.fatMaxPercent);
-  const proteinLimit = numOrNull(s.proteinMaxPercent);
+  const proteinLimit = numOrNull(s.proteinMinPercent);
   const caPLimit = numOrNull(s.caPMaxRatio);
   const calMin = numOrNull(s.caloriesMin);
   const calMax = numOrNull(s.caloriesMax);
 
   const fatWarn = fatLimit !== null && totals.fatPercentOfMass > fatLimit;
-  const proteinWarn = proteinLimit !== null && totals.proteinPercentOfMass > proteinLimit;
+  const proteinWarn = proteinLimit !== null && totals.proteinPercentOfMass < proteinLimit;
   const caPWarn = caPLimit !== null && totals.caPRatio !== null && totals.caPRatio > caPLimit;
   const calWarn = (calMin !== null && totals.calories < calMin) || (calMax !== null && totals.calories > calMax);
 
@@ -515,7 +515,7 @@ function renderSettings() {
     <div class="kbz-section-hint">Если значение в расчёте выходит за рамки — оно подсвечивается красным на главном экране. Пустое поле — без ограничения.</div>
     <div class="kbz-form">
       ${settingsField('Жир выше, % от массы расчёта', 'fatMaxPercent')}
-      ${settingsField('Белок выше, % от массы расчёта', 'proteinMaxPercent')}
+      ${settingsField('Белок ниже, % от массы расчёта', 'proteinMinPercent')}
       ${settingsField('Соотношение Ca:P выше', 'caPMaxRatio')}
       <div class="field">
         <label>Норма калорий, ккал</label>
