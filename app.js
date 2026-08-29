@@ -759,6 +759,8 @@ appEl.addEventListener('input', (e) => {
 
 // ————————————————————————————————————————— init —————————————————————————————————————————
 
+const SEED_BY_ID = new Map(SEED_POSITIONS.map((p) => [p.id, p]));
+
 function migratePosition(p) {
   if (p.calciumPercent !== undefined) return p;
   const migrated = { ...p, calciumPercent: p.fiberPercent ?? 0, phosphorusPercent: p.chitinPercent ?? 0 };
@@ -766,6 +768,25 @@ function migratePosition(p) {
   delete migrated.chitinPercent;
   DB.put('positions', migrated);
   return migrated;
+}
+
+// Сид-позиции, сохранённые до появления дефолтных фото, не подхватывают их сами —
+// добавление image в SEED_POSITIONS трогает только позиции, которых ещё нет в
+// IndexedDB. Подтягиваем фото задним числом, но только один раз (флаг в meta),
+// чтобы не переписывать фото, если пользователь потом сам его удалит.
+async function backfillSeedImages(positions) {
+  const done = await DB.getMeta('seedImagesBackfilled', false);
+  if (done) return positions;
+  const updated = positions.map((p) => {
+    if (p.image) return p;
+    const seed = SEED_BY_ID.get(p.id);
+    if (!seed || !seed.image) return p;
+    const next = { ...p, image: seed.image };
+    DB.put('positions', next);
+    return next;
+  });
+  await DB.setMeta('seedImagesBackfilled', true);
+  return updated;
 }
 
 async function init() {
@@ -787,6 +808,8 @@ async function init() {
     state.positions = [...state.positions, ...toAdd];
     await DB.setMeta('seeded', true);
   }
+
+  state.positions = await backfillSeedImages(state.positions);
 
   render();
 
