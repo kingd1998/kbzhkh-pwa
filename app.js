@@ -51,23 +51,28 @@ function formatDate(ts) {
 function itemTotals(pos, qty) {
   const w = qty * pos.unitWeight;
   return {
+    mass: w,
     calories: w * pos.caloriesPerGram,
     protein: w * (pos.proteinPercent / 100),
     fat: w * (pos.fatPercent / 100),
-    fiber: w * (pos.fiberPercent / 100),
-    chitin: w * (pos.chitinPercent / 100)
+    calcium: w * (pos.calciumPercent / 100),
+    phosphorus: w * (pos.phosphorusPercent / 100)
   };
 }
 
 function draftTotals() {
-  const t = { calories: 0, protein: 0, fat: 0, fiber: 0, chitin: 0 };
+  const t = { mass: 0, calories: 0, protein: 0, fat: 0, calcium: 0, phosphorus: 0 };
   state.positions.forEach((p) => {
     const qty = state.draftItems[p.id] || 0;
     if (qty > 0) {
       const it = itemTotals(p, qty);
-      t.calories += it.calories; t.protein += it.protein; t.fat += it.fat; t.fiber += it.fiber; t.chitin += it.chitin;
+      t.mass += it.mass; t.calories += it.calories; t.protein += it.protein; t.fat += it.fat;
+      t.calcium += it.calcium; t.phosphorus += it.phosphorus;
     }
   });
+  t.proteinPercentOfMass = t.mass > 0 ? (t.protein / t.mass) * 100 : 0;
+  t.fatPercentOfMass = t.mass > 0 ? (t.fat / t.mass) * 100 : 0;
+  t.caPRatio = t.phosphorus > 0 ? t.calcium / t.phosphorus : null;
   return t;
 }
 
@@ -79,7 +84,7 @@ function openAddPicker() { state.screen = 'addPicker'; state.addSearch = ''; ren
 
 function openPositionNew() {
   state.screen = 'edit'; state.editingId = null; state.editErrors = {};
-  state.editForm = { name: '', unitWeight: '', caloriesPerGram: '', proteinPercent: '', fatPercent: '', fiberPercent: '', chitinPercent: '', note: '' };
+  state.editForm = { name: '', unitWeight: '', caloriesPerGram: '', proteinPercent: '', fatPercent: '', calciumPercent: '', phosphorusPercent: '', note: '' };
   render();
 }
 
@@ -90,7 +95,7 @@ function openPositionEdit(id) {
   state.editForm = {
     name: p.name, unitWeight: String(p.unitWeight), caloriesPerGram: String(p.caloriesPerGram),
     proteinPercent: String(p.proteinPercent), fatPercent: String(p.fatPercent),
-    fiberPercent: String(p.fiberPercent), chitinPercent: String(p.chitinPercent), note: p.note || ''
+    calciumPercent: String(p.calciumPercent), phosphorusPercent: String(p.phosphorusPercent), note: p.note || ''
   };
   render();
 }
@@ -101,7 +106,7 @@ function validateEdit(form) {
   if (!form.name || !form.name.trim()) errors.name = 'Введите название';
   if (!(num(form.unitWeight) > 0)) errors.unitWeight = 'Число больше 0';
   if (!(num(form.caloriesPerGram) >= 0)) errors.caloriesPerGram = 'Число от 0';
-  ['proteinPercent', 'fatPercent', 'fiberPercent', 'chitinPercent'].forEach((k) => {
+  ['proteinPercent', 'fatPercent', 'calciumPercent', 'phosphorusPercent'].forEach((k) => {
     const v = num(form[k]);
     if (!(v >= 0 && v <= 100)) errors[k] = 'От 0 до 100';
   });
@@ -119,8 +124,8 @@ function savePosition() {
     caloriesPerGram: Number(f.caloriesPerGram),
     proteinPercent: Number(f.proteinPercent),
     fatPercent: Number(f.fatPercent),
-    fiberPercent: Number(f.fiberPercent),
-    chitinPercent: Number(f.chitinPercent),
+    calciumPercent: Number(f.calciumPercent),
+    phosphorusPercent: Number(f.phosphorusPercent),
     note: (f.note || '').trim()
   };
   if (state.editingId) state.positions = state.positions.map((p) => (p.id === record.id ? record : p));
@@ -209,7 +214,7 @@ function saveCalculation() {
       items.push({
         positionId: p.id, positionNameSnapshot: p.name, unitWeightSnapshot: p.unitWeight, quantity: qty,
         caloriesPerGramSnapshot: p.caloriesPerGram, proteinPercentSnapshot: p.proteinPercent,
-        fatPercentSnapshot: p.fatPercent, fiberPercentSnapshot: p.fiberPercent, chitinPercentSnapshot: p.chitinPercent
+        fatPercentSnapshot: p.fatPercent, calciumPercentSnapshot: p.calciumPercent, phosphorusPercentSnapshot: p.phosphorusPercent
       });
     }
   });
@@ -284,6 +289,10 @@ function summaryCell(label, value) {
   return `<div class="kbz-summary-cell"><div class="kbz-summary-label">${label}</div><div class="kbz-summary-value">${value}</div></div>`;
 }
 
+function fmtCaP(ratio) {
+  return ratio === null ? '—' : `${fmt(ratio)} : 1`;
+}
+
 function renderMain() {
   const totals = draftTotals();
   const calcPositions = state.calcPositionIds
@@ -307,8 +316,8 @@ function renderMain() {
         <span class="tag tag-accent">${fmt(it.calories)} ккал</span>
         <span class="tag tag-neutral">Б ${fmt(it.protein)}г</span>
         <span class="tag tag-neutral">Ж ${fmt(it.fat)}г</span>
-        <span class="tag tag-neutral">Кл ${fmt(it.fiber)}г</span>
-        <span class="tag tag-neutral">Хт ${fmt(it.chitin)}г</span>
+        <span class="tag tag-neutral">Ca ${fmt(it.calcium)}г</span>
+        <span class="tag tag-neutral">P ${fmt(it.phosphorus)}г</span>
       </div>
     </div>`;
   }).join('');
@@ -319,18 +328,19 @@ function renderMain() {
         ${summaryCell('Калории', fmt(totals.calories) + ' ккал')}
         ${summaryCell('Белки', fmt(totals.protein) + ' г')}
         ${summaryCell('Жиры', fmt(totals.fat) + ' г')}
-        ${summaryCell('Клетчатка', fmt(totals.fiber) + ' г')}
-        ${summaryCell('Хитин', fmt(totals.chitin) + ' г')}
+        ${summaryCell('Кальций', fmt(totals.calcium) + ' г')}
+        ${summaryCell('Фосфор', fmt(totals.phosphorus) + ' г')}
       </div>
+      <div class="kbz-summary-extra">Ca:P ${fmtCaP(totals.caPRatio)} · Белки ${fmt(totals.proteinPercentOfMass)}% от массы · Жиры ${fmt(totals.fatPercentOfMass)}% от массы</div>
     </div>
     ${state.positions.length === 0 ? `<div class="kbz-empty"><span>Справочник позиций пуст</span><button class="btn btn-primary" data-action="goto" data-screen="positions">Добавить позицию</button></div>` : ''}
     <button class="kbz-addcalc" data-action="openAddPicker">${ICONS.plus()} Добавить позицию в расчёт</button>
     ${calcPositions.length === 0 ? `<div class="kbz-empty"><span>В расчёте пока нет позиций</span></div>` : `<div>${rows}</div>`}
     <div class="kbz-version">${esc(APP_VERSION)}</div>
   </div>
-  <div class="kbz-actionbar kbz-actionbar-compact">
-    <button class="kbz-actbtn kbz-actbtn-primary" data-action="saveCalculation">${ICONS.save()} Сохранить</button>
-    <button class="kbz-actbtn kbz-actbtn-secondary" data-action="clearDraft">${ICONS.clear()} Очистить</button>
+  <div class="kbz-actionbar">
+    <button class="kbz-actbtn kbz-actbtn-primary" data-action="saveCalculation">${ICONS.save(14)} Сохранить</button>
+    <button class="kbz-actbtn kbz-actbtn-secondary" data-action="clearDraft">${ICONS.clear(14)} Очистить</button>
   </div>`;
 }
 
@@ -388,19 +398,19 @@ function editField(label, key, type) {
 
 function renderEdit() {
   const f = state.editForm;
-  const percentSum = ['proteinPercent', 'fatPercent', 'fiberPercent', 'chitinPercent']
+  const percentSum = ['proteinPercent', 'fatPercent', 'calciumPercent', 'phosphorusPercent']
     .reduce((s, k) => s + (Number(f[k]) || 0), 0);
 
   return `<div class="kbz-body">
     <div class="kbz-form">
-      ${percentSum > 100 ? `<div class="kbz-warning">Сумма Белки+Жиры+Клетчатка+Хитин превышает 100% — проверьте значения (в реальности это невозможно).</div>` : ''}
+      ${percentSum > 100 ? `<div class="kbz-warning">Сумма Белки+Жиры+Кальций+Фосфор превышает 100% — проверьте значения (в реальности это невозможно).</div>` : ''}
       ${editField('Название', 'name', 'text')}
       ${editField('Вес 1 шт (г)', 'unitWeight', 'number')}
       ${editField('Калории — ккал на 1 г', 'caloriesPerGram', 'number')}
       ${editField('Белки — % от веса', 'proteinPercent', 'number')}
       ${editField('Жиры — % от веса', 'fatPercent', 'number')}
-      ${editField('Клетчатка — % от веса', 'fiberPercent', 'number')}
-      ${editField('Хитин — % от веса', 'chitinPercent', 'number')}
+      ${editField('Кальций — % от веса', 'calciumPercent', 'number')}
+      ${editField('Фосфор — % от веса', 'phosphorusPercent', 'number')}
       <div class="field">
         <label>Заметка</label>
         <textarea class="input" rows="3" id="f-note" data-field="note" placeholder="Например, ключевые особенности вида">${esc(f.note)}</textarea>
@@ -538,8 +548,17 @@ appEl.addEventListener('input', (e) => {
 
 // ————————————————————————————————————————— init —————————————————————————————————————————
 
+function migratePosition(p) {
+  if (p.calciumPercent !== undefined) return p;
+  const migrated = { ...p, calciumPercent: p.fiberPercent ?? 0, phosphorusPercent: p.chitinPercent ?? 0 };
+  delete migrated.fiberPercent;
+  delete migrated.chitinPercent;
+  DB.put('positions', migrated);
+  return migrated;
+}
+
 async function init() {
-  state.positions = await DB.getAll('positions');
+  state.positions = (await DB.getAll('positions')).map(migratePosition);
   state.savedCalcs = await DB.getAll('savedCalcs');
   state.draftItems = await DB.getMeta('draftItems', {});
   state.calcPositionIds = await DB.getMeta('calcPositionIds', []);
