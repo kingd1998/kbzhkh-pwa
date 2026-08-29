@@ -91,27 +91,39 @@ function draftTotals() {
 
 // ————————————————————————————————————————— actions —————————————————————————————————————————
 
-function goTo(screen) { state.screen = screen; state.confirm = null; render(); }
+// Каждый переход на новый экран кладёт запись в history, поэтому системный жест
+// «назад» (свайп на Android/iOS) прилетает как popstate и возвращает на предыдущий
+// экран приложения, а не закрывает PWA — браузеру есть куда идти назад. Обратные
+// переходы (кнопка «назад» в шапке, отмена, сохранение и т.п.) не трогают
+// state.screen напрямую, а вызывают history.back(): так жест и кнопка идут по
+// одному и тому же пути и никогда не расходятся.
+function pushScreen(screen) {
+  state.screen = screen;
+  history.pushState({ screen }, '', '');
+  render();
+}
 
-function openAddPicker() { state.screen = 'addPicker'; state.addSearch = ''; render(); }
+function goTo(screen) { state.confirm = null; pushScreen(screen); }
+
+function openAddPicker() { state.addSearch = ''; pushScreen('addPicker'); }
 
 function openPositionNew() {
-  state.screen = 'edit'; state.editingId = null; state.editErrors = {};
+  state.editingId = null; state.editErrors = {};
   state.editForm = { name: '', unitWeight: '', caloriesPerGram: '', proteinPercent: '', fatPercent: '', calciumPercent: '', phosphorusPercent: '', note: '', image: null };
-  render();
+  pushScreen('edit');
 }
 
 function openPositionEdit(id) {
   const p = state.positions.find((x) => x.id === id);
   if (!p) return;
-  state.screen = 'edit'; state.editingId = id; state.editErrors = {};
+  state.editingId = id; state.editErrors = {};
   state.editForm = {
     name: p.name, unitWeight: String(p.unitWeight), caloriesPerGram: String(p.caloriesPerGram),
     proteinPercent: String(p.proteinPercent), fatPercent: String(p.fatPercent),
     calciumPercent: String(p.calciumPercent), phosphorusPercent: String(p.phosphorusPercent), note: p.note || '',
     image: p.image || null
   };
-  render();
+  pushScreen('edit');
 }
 
 // Даунскейлит и центрирует по кадру любую загруженную фотографию до
@@ -186,13 +198,11 @@ function savePosition() {
   if (state.editingId) state.positions = state.positions.map((p) => (p.id === record.id ? record : p));
   else state.positions = [...state.positions, record];
   DB.put('positions', record);
-  state.screen = 'positions'; state.editForm = null; state.editErrors = {}; state.editingId = null;
-  render();
+  history.back();
 }
 
 function cancelEdit() {
-  state.screen = 'positions'; state.editForm = null; state.editErrors = {}; state.editingId = null;
-  render();
+  history.back();
 }
 
 function askDeletePosition(id) {
@@ -210,6 +220,7 @@ function askDeleteSaved(id) {
 function confirmDelete() {
   const c = state.confirm;
   if (!c) return;
+  const wasEditingDeleted = c.type === 'position' && state.screen === 'edit';
   if (c.type === 'position') {
     state.positions = state.positions.filter((p) => p.id !== c.id);
     delete state.draftItems[c.id];
@@ -217,13 +228,16 @@ function confirmDelete() {
     DB.del('positions', c.id);
     DB.setMeta('draftItems', state.draftItems);
     DB.setMeta('calcPositionIds', state.calcPositionIds);
-    if (state.screen === 'edit') { state.screen = 'positions'; state.editForm = null; }
   } else if (c.type === 'saved') {
     state.savedCalcs = state.savedCalcs.filter((s) => s.id !== c.id);
     DB.del('savedCalcs', c.id);
   }
-  state.confirm = null;
-  render();
+  if (wasEditingDeleted) {
+    history.back();
+  } else {
+    state.confirm = null;
+    render();
+  }
 }
 
 function removeFromCalc(id) {
@@ -302,7 +316,7 @@ async function sendFeedback() {
     if (!res.ok) throw new Error('bad status');
     state.feedbackText = '';
     showToast('Отправлено', 'light');
-    goTo('settings');
+    history.back();
   } catch (e) {
     showToast('Не удалось отправить');
   } finally {
@@ -324,8 +338,7 @@ function loadSaved(id) {
   state.calcPositionIds = calcIds;
   DB.setMeta('draftItems', draftItems);
   DB.setMeta('calcPositionIds', calcIds);
-  state.screen = 'main';
-  render();
+  history.back();
 }
 
 // ————————————————————————————————————————— rendering —————————————————————————————————————————
@@ -341,12 +354,12 @@ function renderNav() {
       </div>`;
     case 'addPicker':
       return `<div class="kbz-nav">
-        <button class="kbz-iconbtn" data-action="goto" data-screen="main" aria-label="Назад">${ICONS.back()}</button>
+        <button class="kbz-iconbtn" data-action="back" aria-label="Назад">${ICONS.back()}</button>
         <span class="kbz-navtitle">Добавить в расчёт</span>
       </div>`;
     case 'positions':
       return `<div class="kbz-nav">
-        <button class="kbz-iconbtn" data-action="goto" data-screen="main" aria-label="Назад">${ICONS.back()}</button>
+        <button class="kbz-iconbtn" data-action="back" aria-label="Назад">${ICONS.back()}</button>
         <span class="kbz-navtitle">Позиции</span>
         <button class="kbz-iconbtn" data-action="newPosition" aria-label="Добавить">${ICONS.plus()}</button>
       </div>`;
@@ -358,12 +371,12 @@ function renderNav() {
       </div>`;
     case 'history':
       return `<div class="kbz-nav">
-        <button class="kbz-iconbtn" data-action="goto" data-screen="main" aria-label="Назад">${ICONS.back()}</button>
+        <button class="kbz-iconbtn" data-action="back" aria-label="Назад">${ICONS.back()}</button>
         <span class="kbz-navtitle">История</span>
       </div>`;
     case 'settings':
       return `<div class="kbz-nav">
-        <button class="kbz-iconbtn" data-action="goto" data-screen="main" aria-label="Назад">${ICONS.back()}</button>
+        <button class="kbz-iconbtn" data-action="back" aria-label="Назад">${ICONS.back()}</button>
         <span class="kbz-navtitle">Настройки</span>
       </div>`;
     case 'feedback':
@@ -671,6 +684,16 @@ function rerenderPreservingFocus() {
 
 const appEl = document.getElementById('app');
 
+// Срабатывает и на системный жест «назад» (Android/iOS), и на любой другой откат
+// history — в паре с pushScreen() это единственное место, применяющее экран из
+// history.state, так что жест и явный "назад" в приложении всегда синхронны.
+window.addEventListener('popstate', (e) => {
+  state.screen = (e.state && e.state.screen) || 'main';
+  state.confirm = null;
+  if (state.screen !== 'edit') { state.editForm = null; state.editErrors = {}; state.editingId = null; }
+  render();
+});
+
 let holdTimeout = null;
 let holdInterval = null;
 function startHold(fn) {
@@ -706,6 +729,7 @@ appEl.addEventListener('click', (e) => {
   const { action, id, screen } = el.dataset;
   switch (action) {
     case 'goto': goTo(screen); break;
+    case 'back': history.back(); break;
     case 'openAddPicker': openAddPicker(); break;
     case 'newPosition': openPositionNew(); break;
     case 'editPosition': openPositionEdit(id); break;
@@ -840,6 +864,7 @@ async function refreshSeedNutrition(positions) {
 }
 
 async function init() {
+  history.replaceState({ screen: 'main' }, '', '');
   state.positions = (await DB.getAll('positions')).map(migratePosition);
   state.savedCalcs = await DB.getAll('savedCalcs');
   state.draftItems = await DB.getMeta('draftItems', {});
